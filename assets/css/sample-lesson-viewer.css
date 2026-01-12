@@ -1,0 +1,218 @@
+/**
+ * Sample Lesson Viewer for LearnDash
+ * Main Stylesheet
+ */
+
+/* Container */
+.slv-sample-lessons-wrapper {
+    margin: 20px 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+/* Course Section */
+.slv-course-section {
+    margin-bottom: 40px;
+}
+
+.slv-course-title {
+    font-size: 1.5em;
+    font-weight: 600;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #0073aa;
+    color: #23282d;
+}
+
+.slv-course-title a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.slv-course-title a:hover {
+    color: #0073aa;
+}
+
+/* Lessons Grid */
+.slv-lessons-grid {
+    display: grid;
+    gap: 20px;
+}
+
+.slv-columns-1 {
+    grid-template-columns: 1fr;
+}
+
+.slv-columns-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.slv-columns-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.slv-columns-4 {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+/* Lesson Card */
+.slv-lesson-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.slv-lesson-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+/* Lesson Thumbnail */
+.slv-lesson-thumbnail {
+    overflow: hidden;
+}
+
+.slv-lesson-thumbnail img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.3s ease;
+}
+
+.slv-lesson-card:hover .slv-lesson-thumbnail img {
+    transform: scale(1.05);
+}
+
+/* Lesson Content */
+.slv-lesson-content {
+    padding: 20px;
+}
+
+.slv-lesson-title {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin: 0 0 10px 0;
+    line-height: 1.3;
+}
+
+.slv-lesson-title a {
+    color: #333;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.slv-lesson-title a:hover {
+    color: #0073aa;
+}
+
+.slv-lesson-course {
+    display: block;
+    font-size: 0.85em;
+    color: #666;
+    margin-bottom: 10px;
+    font-style: italic;
+}
+
+.slv-lesson-excerpt {
+    font-size: 0.9em;
+    color: #555;
+    margin-bottom: 15px;
+    line-height: 1.6;
+}
+
+/* View Lesson Button */
+.slv-lesson-link {
+    display: inline-block;
+    padding: 10px 20px;
+    background: #0073aa;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-weight: 500;
+    transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.slv-lesson-link:hover {
+    background: #005177;
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+/* Messages */
+.slv-no-lessons,
+.slv-error {
+    padding: 20px;
+    background: #f7f7f7;
+    border-left: 4px solid #0073aa;
+    margin: 20px 0;
+    font-size: 1em;
+    color: #555;
+}
+
+.slv-error {
+    border-left-color: #dc3232;
+    background: #fef7f7;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .slv-columns-2,
+    .slv-columns-3,
+    .slv-columns-4 {
+        grid-template-columns: 1fr;
+    }
+
+    .slv-lesson-content {
+        padding: 15px;
+    }
+
+    .slv-course-title {
+        font-size: 1.3em;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    .slv-columns-3,
+    .slv-columns-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .slv-lesson-card {
+        background: #2d2d2d;
+        border-color: #444;
+    }
+
+    .slv-lesson-title a {
+        color: #e0e0e0;
+    }
+
+    .slv-lesson-title a:hover {
+        color: #5cb8e6;
+    }
+
+    .slv-lesson-course,
+    .slv-lesson-excerpt {
+        color: #aaa;
+    }
+
+    .slv-course-title {
+        color: #e0e0e0;
+        border-bottom-color: #5cb8e6;
+    }
+
+    .slv-course-title a:hover {
+        color: #5cb8e6;
+    }
+
+    .slv-no-lessons {
+        background: #2d2d2d;
+        color: #aaa;
+    }
+}
