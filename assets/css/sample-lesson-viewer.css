@@ -1,6 +1,6 @@
 /**
  * Sample Lesson Viewer for LearnDash
- * Main Stylesheet
+ * Main Stylesheet - v1.1.0
  */
 
 /* Container */
@@ -36,7 +36,7 @@
 /* Lessons Grid */
 .slv-lessons-grid {
     display: grid;
-    gap: 20px;
+    gap: 24px;
 }
 
 .slv-columns-1 {
@@ -62,11 +62,41 @@
     border-radius: 8px;
     overflow: hidden;
     transition: box-shadow 0.3s ease, transform 0.3s ease;
+    display: flex;
+    flex-direction: column;
 }
 
 .slv-lesson-card:hover {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     transform: translateY(-2px);
+}
+
+/* Video Container - 16:9 Aspect Ratio */
+.slv-video-container {
+    position: relative;
+    width: 100%;
+    background: #000;
+}
+
+.slv-video-wrapper {
+    position: relative;
+    padding-bottom: 56.25%; /* 16:9 aspect ratio */
+    height: 0;
+    overflow: hidden;
+}
+
+.slv-video-wrapper iframe,
+.slv-video-wrapper video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.slv-video-wrapper video {
+    background: #000;
 }
 
 /* Lesson Thumbnail */
@@ -89,6 +119,9 @@
 /* Lesson Content */
 .slv-lesson-content {
     padding: 20px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 .slv-lesson-title {
@@ -121,6 +154,7 @@
     color: #555;
     margin-bottom: 15px;
     line-height: 1.6;
+    flex-grow: 1;
 }
 
 /* View Lesson Button */
@@ -134,6 +168,8 @@
     font-size: 0.9em;
     font-weight: 500;
     transition: background 0.3s ease, transform 0.2s ease;
+    text-align: center;
+    align-self: flex-start;
 }
 
 .slv-lesson-link:hover {
@@ -158,7 +194,11 @@
     background: #fef7f7;
 }
 
-/* Responsive Design */
+/* =====================================================
+   RESPONSIVE DESIGN
+   ===================================================== */
+
+/* Mobile - Single column */
 @media (max-width: 768px) {
     .slv-columns-2,
     .slv-columns-3,
@@ -173,8 +213,13 @@
     .slv-course-title {
         font-size: 1.3em;
     }
+
+    .slv-lessons-grid {
+        gap: 16px;
+    }
 }
 
+/* Tablet - 2 columns max */
 @media (min-width: 769px) and (max-width: 1024px) {
     .slv-columns-3,
     .slv-columns-4 {
@@ -182,7 +227,83 @@
     }
 }
 
-/* Dark mode support */
+/* Large screens - Optimized for video display */
+@media (min-width: 1025px) and (max-width: 1399px) {
+    .slv-with-video .slv-columns-3 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .slv-with-video .slv-columns-4 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Extra large screens - Full column support for videos */
+@media (min-width: 1400px) {
+    .slv-with-video .slv-columns-2 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .slv-with-video .slv-columns-3 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .slv-with-video .slv-columns-4 {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    .slv-lessons-grid {
+        gap: 30px;
+    }
+}
+
+/* Ultra wide screens */
+@media (min-width: 1800px) {
+    .slv-with-video .slv-columns-2 {
+        grid-template-columns: repeat(2, 1fr);
+        max-width: 1600px;
+    }
+
+    .slv-with-video .slv-columns-3 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .slv-with-video .slv-columns-4 {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* =====================================================
+   VIDEO-SPECIFIC STYLES
+   ===================================================== */
+
+/* Cards with video get special treatment */
+.slv-lesson-card.slv-has-video {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.slv-lesson-card.slv-has-video:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* Video play indicator overlay (for future enhancement) */
+.slv-video-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    z-index: 1;
+    pointer-events: none;
+    transition: background 0.3s ease;
+}
+
+/* =====================================================
+   DARK MODE SUPPORT
+   ===================================================== */
+
 @media (prefers-color-scheme: dark) {
     .slv-lesson-card {
         background: #2d2d2d;
@@ -214,5 +335,39 @@
     .slv-no-lessons {
         background: #2d2d2d;
         color: #aaa;
+    }
+
+    .slv-lesson-link {
+        background: #5cb8e6;
+    }
+
+    .slv-lesson-link:hover {
+        background: #3a9fd0;
+    }
+}
+
+/* =====================================================
+   PRINT STYLES
+   ===================================================== */
+
+@media print {
+    .slv-video-container,
+    .slv-video-wrapper {
+        display: none;
+    }
+
+    .slv-lesson-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ccc;
+    }
+
+    .slv-lessons-grid {
+        display: block;
+    }
+
+    .slv-lesson-card {
+        margin-bottom: 20px;
     }
 }
