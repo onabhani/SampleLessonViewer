@@ -3,7 +3,7 @@
  * Plugin Name: Sample Lesson Viewer for LearnDash
  * Plugin URI: https://github.com/onabhani/SampleLessonViewer
  * Description: Display all sample lessons from all LearnDash courses using a simple shortcode [learndash_sample_lessons]
- * Version: 1.3.0
+ * Version: 1.4.0
  * Author: Developer
  * Author URI: https://github.com/onabhani
  * License: GPL-2.0+
@@ -57,14 +57,14 @@ function slv_enqueue_styles() {
         'sample-lesson-viewer',
         plugin_dir_url( __FILE__ ) . 'assets/css/sample-lesson-viewer.css',
         array(),
-        '1.3.0'
+        '1.4.0'
     );
 
     wp_register_script(
         'sample-lesson-viewer',
         plugin_dir_url( __FILE__ ) . 'assets/js/sample-lesson-viewer.js',
         array(),
-        '1.3.0',
+        '1.4.0',
         true
     );
 }
@@ -207,24 +207,26 @@ function slv_extract_video_from_content( $content ) {
 }
 
 /**
- * Process video URL and generate embed code - Enhanced version
+ * Process video URL and generate embed code - Enhanced version with lazy loading
  *
  * @param string $url The video URL
  * @return array Video data with embed code
  */
 function slv_process_video_url( $url ) {
     $video_data = array(
-        'url'      => $url,
-        'embed'    => '',
-        'provider' => '',
-        'video_id' => '',
+        'url'       => $url,
+        'embed'     => '',
+        'provider'  => '',
+        'video_id'  => '',
+        'thumbnail' => '',
     );
 
-    // YouTube
+    // YouTube - with thumbnail for lazy loading
     if ( preg_match( '/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/', $url, $matches ) ) {
         $video_data['provider'] = 'youtube';
         $video_data['video_id'] = $matches[1];
-        $video_data['embed'] = '<iframe src="https://www.youtube.com/embed/' . esc_attr( $matches[1] ) . '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>';
+        $video_data['thumbnail'] = 'https://img.youtube.com/vi/' . $matches[1] . '/hqdefault.jpg';
+        $video_data['embed'] = '<iframe data-src="https://www.youtube.com/embed/' . esc_attr( $matches[1] ) . '?rel=0&autoplay=1" frameborder="0" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>';
         return $video_data;
     }
 
@@ -232,7 +234,7 @@ function slv_process_video_url( $url ) {
     if ( preg_match( '/vimeo\.com\/(?:video\/)?(\d+)/', $url, $matches ) ) {
         $video_data['provider'] = 'vimeo';
         $video_data['video_id'] = $matches[1];
-        $video_data['embed'] = '<iframe src="https://player.vimeo.com/video/' . esc_attr( $matches[1] ) . '?badge=0&autopause=0" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>';
+        $video_data['embed'] = '<iframe src="https://player.vimeo.com/video/' . esc_attr( $matches[1] ) . '?badge=0&autopause=0" frameborder="0" loading="lazy" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>';
         return $video_data;
     }
 
@@ -240,7 +242,7 @@ function slv_process_video_url( $url ) {
     if ( preg_match( '/wistia\.(?:com|net)\/(?:medias|embed\/iframe)\/([a-zA-Z0-9]+)/', $url, $matches ) ) {
         $video_data['provider'] = 'wistia';
         $video_data['video_id'] = $matches[1];
-        $video_data['embed'] = '<iframe src="https://fast.wistia.net/embed/iframe/' . esc_attr( $matches[1] ) . '?videoFoam=true" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>';
+        $video_data['embed'] = '<iframe src="https://fast.wistia.net/embed/iframe/' . esc_attr( $matches[1] ) . '?videoFoam=true" frameborder="0" loading="lazy" allow="autoplay; fullscreen" allowfullscreen></iframe>';
         return $video_data;
     }
 
@@ -250,8 +252,7 @@ function slv_process_video_url( $url ) {
         if ( strpos( $url, 'iframe.mediadelivery.net' ) !== false ) {
             $video_data['embed'] = '<iframe src="' . esc_url( $url ) . '" loading="lazy" frameborder="0" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
         } else {
-            // Direct bunny CDN video file
-            $video_data['embed'] = '<video controls preload="metadata"><source src="' . esc_url( $url ) . '" type="video/mp4">Your browser does not support the video tag.</video>';
+            $video_data['embed'] = '<video controls preload="none" loading="lazy"><source src="' . esc_url( $url ) . '" type="video/mp4">Your browser does not support the video tag.</video>';
         }
         return $video_data;
     }
@@ -259,21 +260,21 @@ function slv_process_video_url( $url ) {
     // Cloudflare Stream
     if ( strpos( $url, 'cloudflarestream.com' ) !== false || strpos( $url, 'videodelivery.net' ) !== false ) {
         $video_data['provider'] = 'cloudflare';
-        $video_data['embed'] = '<iframe src="' . esc_url( $url ) . '" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>';
+        $video_data['embed'] = '<iframe src="' . esc_url( $url ) . '" frameborder="0" loading="lazy" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>';
         return $video_data;
     }
 
     // Self-hosted video (mp4, webm, ogg, mov)
     if ( preg_match( '/\.(mp4|webm|ogg|mov|m4v)(\?|$)/i', $url ) ) {
         $video_data['provider'] = 'self-hosted';
-        $video_data['embed'] = '<video controls preload="metadata"><source src="' . esc_url( $url ) . '" type="video/mp4">Your browser does not support the video tag.</video>';
+        $video_data['embed'] = '<video controls preload="none"><source src="' . esc_url( $url ) . '" type="video/mp4">Your browser does not support the video tag.</video>';
         return $video_data;
     }
 
     // Generic iframe URL (for unknown providers)
     if ( strpos( $url, 'iframe' ) !== false || strpos( $url, 'embed' ) !== false || strpos( $url, 'player' ) !== false ) {
         $video_data['provider'] = 'iframe';
-        $video_data['embed'] = '<iframe src="' . esc_url( $url ) . '" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>';
+        $video_data['embed'] = '<iframe src="' . esc_url( $url ) . '" frameborder="0" loading="lazy" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>';
         return $video_data;
     }
 
@@ -517,6 +518,48 @@ function slv_display_sample_lessons( $atts ) {
         height: 100%;
         border: none;
     }
+    /* Lazy load video thumbnail with play button */
+    .slv-video-lazy {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        cursor: pointer;
+        background-size: cover;
+        background-position: center;
+        background-color: #000;
+    }
+    .slv-video-lazy img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .slv-play-btn {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 68px;
+        height: 48px;
+        background: rgba(255,0,0,0.9);
+        border-radius: 14px;
+        transition: background 0.2s ease, transform 0.2s ease;
+    }
+    .slv-video-lazy:hover .slv-play-btn {
+        background: #f00;
+        transform: translate(-50%, -50%) scale(1.1);
+    }
+    .slv-play-btn::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-40%, -50%);
+        border-style: solid;
+        border-width: 10px 0 10px 18px;
+        border-color: transparent transparent transparent #fff;
+    }
     .slv-lesson-thumbnail {
         overflow: hidden;
         background: #f5f5f5;
@@ -609,18 +652,27 @@ function slv_display_sample_lessons( $atts ) {
                                 <div class="slv-lesson-card">
                                     <?php
                                     $has_video = $include_video && ! empty( $lesson['video'] ) && ! empty( $lesson['video']['embed'] );
+                                    $is_youtube = $has_video && $lesson['video']['provider'] === 'youtube' && ! empty( $lesson['video']['thumbnail'] );
                                     ?>
 
                                     <?php if ( $has_video ) : ?>
                                         <div class="slv-video-container">
                                             <div class="slv-video-wrapper">
-                                                <?php echo $lesson['video']['embed']; ?>
+                                                <?php if ( $is_youtube ) : ?>
+                                                    <!-- Lazy load YouTube: show thumbnail, load iframe on click -->
+                                                    <div class="slv-video-lazy" onclick="slvLoadVideo(this)" data-embed="<?php echo esc_attr( $lesson['video']['embed'] ); ?>">
+                                                        <img src="<?php echo esc_url( $lesson['video']['thumbnail'] ); ?>" alt="<?php echo esc_attr( $lesson['title'] ); ?>" loading="lazy">
+                                                        <div class="slv-play-btn"></div>
+                                                    </div>
+                                                <?php else : ?>
+                                                    <?php echo $lesson['video']['embed']; ?>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
                                     <?php elseif ( $atts['show_thumbnail'] === 'yes' && ! empty( $lesson['thumbnail'] ) ) : ?>
                                         <div class="slv-lesson-thumbnail">
                                             <a href="<?php echo esc_url( $lesson['url'] ); ?>">
-                                                <img src="<?php echo esc_url( $lesson['thumbnail'] ); ?>" alt="<?php echo esc_attr( $lesson['title'] ); ?>">
+                                                <img src="<?php echo esc_url( $lesson['thumbnail'] ); ?>" alt="<?php echo esc_attr( $lesson['title'] ); ?>" loading="lazy">
                                             </a>
                                         </div>
                                     <?php endif; ?>
@@ -650,6 +702,15 @@ function slv_display_sample_lessons( $atts ) {
             <?php endforeach; ?>
         </div>
     </div>
+
+    <script>
+    function slvLoadVideo(el) {
+        var embed = el.getAttribute('data-embed');
+        // Replace data-src with src in the iframe
+        embed = embed.replace('data-src=', 'src=');
+        el.parentNode.innerHTML = embed;
+    }
+    </script>
     <?php
 
     return ob_get_clean();
