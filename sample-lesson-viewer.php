@@ -3,7 +3,7 @@
  * Plugin Name: Sample Lesson Viewer for LearnDash
  * Plugin URI: https://github.com/onabhani/SampleLessonViewer
  * Description: Display all sample lessons from all LearnDash courses using a simple shortcode [learndash_sample_lessons]
- * Version: 1.2.0
+ * Version: 1.3.0
  * Author: Developer
  * Author URI: https://github.com/onabhani
  * License: GPL-2.0+
@@ -57,14 +57,14 @@ function slv_enqueue_styles() {
         'sample-lesson-viewer',
         plugin_dir_url( __FILE__ ) . 'assets/css/sample-lesson-viewer.css',
         array(),
-        '1.2.0'
+        '1.3.0'
     );
 
     wp_register_script(
         'sample-lesson-viewer',
         plugin_dir_url( __FILE__ ) . 'assets/js/sample-lesson-viewer.js',
         array(),
-        '1.2.0',
+        '1.3.0',
         true
     );
 }
@@ -446,52 +446,56 @@ function slv_display_sample_lessons( $atts ) {
         margin: 20px 0;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    .slv-course-section {
-        margin-bottom: 40px;
-    }
-    .slv-course-title {
-        font-size: 1.4em;
-        font-weight: 600;
-        margin-bottom: 20px;
-        padding-bottom: 10px;
-        border-bottom: 3px solid #0073aa;
-        color: #23282d;
-    }
-    .slv-course-title a {
-        color: inherit;
-        text-decoration: none;
-    }
-    .slv-course-title a:hover {
-        color: #0073aa;
-    }
-    .slv-lessons-grid {
+    /* Courses Grid - responsive grid for course sections */
+    .slv-courses-grid {
         display: grid !important;
-        gap: 20px !important;
-        grid-template-columns: repeat(<?php echo $columns; ?>, 1fr) !important;
+        gap: 24px !important;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)) !important;
     }
     @media (max-width: 768px) {
-        .slv-lessons-grid {
+        .slv-courses-grid {
             grid-template-columns: 1fr !important;
         }
     }
-    @media (min-width: 769px) and (max-width: 1024px) {
-        .slv-lessons-grid {
-            grid-template-columns: repeat(<?php echo min( $columns, 2 ); ?>, 1fr) !important;
-        }
-    }
-    .slv-lesson-card {
+    .slv-course-section {
         background: #fff;
         border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .slv-course-title {
+        font-size: 1.1em;
+        font-weight: 600;
+        margin: 0;
+        padding: 16px;
+        background: linear-gradient(135deg, #0073aa 0%, #005177 100%);
+        color: #fff;
+    }
+    .slv-course-title a {
+        color: #fff;
+        text-decoration: none;
+    }
+    .slv-course-title a:hover {
+        text-decoration: underline;
+    }
+    .slv-lessons-container {
+        padding: 16px;
+    }
+    .slv-lessons-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 16px !important;
+    }
+    .slv-lesson-card {
+        background: #f9f9f9;
+        border: 1px solid #eee;
         border-radius: 8px;
         overflow: hidden;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        transition: box-shadow 0.3s ease, transform 0.3s ease;
-        display: flex;
-        flex-direction: column;
+        transition: box-shadow 0.3s ease;
     }
     .slv-lesson-card:hover {
-        box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
     .slv-video-container {
         position: relative;
@@ -519,20 +523,17 @@ function slv_display_sample_lessons( $atts ) {
     }
     .slv-lesson-thumbnail img {
         width: 100%;
-        height: 180px;
+        height: 160px;
         object-fit: cover;
         display: block;
     }
     .slv-lesson-content {
-        padding: 16px;
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
+        padding: 12px;
     }
     .slv-lesson-title {
-        font-size: 1em;
+        font-size: 0.95em;
         font-weight: 600;
-        margin: 0 0 12px 0;
+        margin: 0 0 10px 0;
         line-height: 1.4;
     }
     .slv-lesson-title a {
@@ -543,24 +544,21 @@ function slv_display_sample_lessons( $atts ) {
         color: #0073aa;
     }
     .slv-lesson-excerpt {
-        font-size: 0.9em;
+        font-size: 0.85em;
         color: #666;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
         line-height: 1.5;
-        flex-grow: 1;
     }
     .slv-lesson-link {
         display: inline-block;
-        padding: 10px 20px;
+        padding: 8px 16px;
         background: #0073aa;
         color: #fff !important;
         text-decoration: none !important;
         border-radius: 4px;
-        font-size: 0.9em;
+        font-size: 0.85em;
         font-weight: 500;
-        text-align: center;
         transition: background 0.3s ease;
-        align-self: flex-start;
     }
     .slv-lesson-link:hover {
         background: #005177;
@@ -580,8 +578,8 @@ function slv_display_sample_lessons( $atts ) {
         direction: rtl;
         text-align: right;
     }
-    .slv-rtl .slv-lesson-link {
-        align-self: flex-end;
+    .slv-rtl .slv-course-title {
+        background: linear-gradient(135deg, #005177 0%, #0073aa 100%);
     }
     .slv-rtl .slv-no-lessons,
     .slv-rtl .slv-error {
@@ -594,62 +592,63 @@ function slv_display_sample_lessons( $atts ) {
     </style>
 
     <div class="slv-sample-lessons-wrapper <?php echo $is_rtl ? 'slv-rtl' : ''; ?>" <?php echo $dir_attr; ?>>
-        <?php foreach ( $sample_lessons as $course_id => $course_data ) : ?>
-            <?php if ( $atts['show_course'] === 'yes' ) : ?>
+        <div class="slv-courses-grid">
+            <?php foreach ( $sample_lessons as $course_id => $course_data ) : ?>
                 <div class="slv-course-section">
-                    <h2 class="slv-course-title">
-                        <a href="<?php echo esc_url( $course_data['course_url'] ); ?>">
-                            <?php echo esc_html( $course_data['course_title'] ); ?>
-                        </a>
-                    </h2>
-            <?php endif; ?>
-
-            <div class="slv-lessons-grid">
-                <?php foreach ( $course_data['lessons'] as $lesson ) : ?>
-                    <div class="slv-lesson-card">
-                        <?php
-                        $has_video = $include_video && ! empty( $lesson['video'] ) && ! empty( $lesson['video']['embed'] );
-                        ?>
-
-                        <?php if ( $has_video ) : ?>
-                            <div class="slv-video-container">
-                                <div class="slv-video-wrapper">
-                                    <?php echo $lesson['video']['embed']; ?>
-                                </div>
-                            </div>
-                        <?php elseif ( $atts['show_thumbnail'] === 'yes' && ! empty( $lesson['thumbnail'] ) ) : ?>
-                            <div class="slv-lesson-thumbnail">
-                                <a href="<?php echo esc_url( $lesson['url'] ); ?>">
-                                    <img src="<?php echo esc_url( $lesson['thumbnail'] ); ?>" alt="<?php echo esc_attr( $lesson['title'] ); ?>">
-                                </a>
-                            </div>
-                        <?php endif; ?>
-
-                        <div class="slv-lesson-content">
-                            <h3 class="slv-lesson-title">
-                                <a href="<?php echo esc_url( $lesson['url'] ); ?>">
-                                    <?php echo esc_html( $lesson['title'] ); ?>
-                                </a>
-                            </h3>
-
-                            <?php if ( $atts['show_excerpt'] === 'yes' && ! empty( $lesson['excerpt'] ) ) : ?>
-                                <div class="slv-lesson-excerpt">
-                                    <?php echo wp_kses_post( $lesson['excerpt'] ); ?>
-                                </div>
-                            <?php endif; ?>
-
-                            <a href="<?php echo esc_url( $lesson['url'] ); ?>" class="slv-lesson-link">
-                                <?php echo $is_rtl ? 'مشاهدة الدرس' : 'View Lesson'; ?>
+                    <?php if ( $atts['show_course'] === 'yes' ) : ?>
+                        <h2 class="slv-course-title">
+                            <a href="<?php echo esc_url( $course_data['course_url'] ); ?>">
+                                <?php echo esc_html( $course_data['course_title'] ); ?>
                             </a>
+                        </h2>
+                    <?php endif; ?>
+
+                    <div class="slv-lessons-container">
+                        <div class="slv-lessons-grid">
+                            <?php foreach ( $course_data['lessons'] as $lesson ) : ?>
+                                <div class="slv-lesson-card">
+                                    <?php
+                                    $has_video = $include_video && ! empty( $lesson['video'] ) && ! empty( $lesson['video']['embed'] );
+                                    ?>
+
+                                    <?php if ( $has_video ) : ?>
+                                        <div class="slv-video-container">
+                                            <div class="slv-video-wrapper">
+                                                <?php echo $lesson['video']['embed']; ?>
+                                            </div>
+                                        </div>
+                                    <?php elseif ( $atts['show_thumbnail'] === 'yes' && ! empty( $lesson['thumbnail'] ) ) : ?>
+                                        <div class="slv-lesson-thumbnail">
+                                            <a href="<?php echo esc_url( $lesson['url'] ); ?>">
+                                                <img src="<?php echo esc_url( $lesson['thumbnail'] ); ?>" alt="<?php echo esc_attr( $lesson['title'] ); ?>">
+                                            </a>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <div class="slv-lesson-content">
+                                        <h3 class="slv-lesson-title">
+                                            <a href="<?php echo esc_url( $lesson['url'] ); ?>">
+                                                <?php echo esc_html( $lesson['title'] ); ?>
+                                            </a>
+                                        </h3>
+
+                                        <?php if ( $atts['show_excerpt'] === 'yes' && ! empty( $lesson['excerpt'] ) ) : ?>
+                                            <div class="slv-lesson-excerpt">
+                                                <?php echo wp_kses_post( $lesson['excerpt'] ); ?>
+                                            </div>
+                                        <?php endif; ?>
+
+                                        <a href="<?php echo esc_url( $lesson['url'] ); ?>" class="slv-lesson-link">
+                                            <?php echo $is_rtl ? 'مشاهدة الدرس' : 'View Lesson'; ?>
+                                        </a>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
-                <?php endforeach; ?>
-            </div>
-
-            <?php if ( $atts['show_course'] === 'yes' ) : ?>
                 </div>
-            <?php endif; ?>
-        <?php endforeach; ?>
+            <?php endforeach; ?>
+        </div>
     </div>
     <?php
 
