@@ -3,7 +3,7 @@
  * Plugin Name: Sample Lesson Viewer for LearnDash
  * Plugin URI: https://github.com/onabhani/SampleLessonViewer
  * Description: Display all sample lessons from all LearnDash courses using a simple shortcode [learndash_sample_lessons]
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: Developer
  * Author URI: https://github.com/onabhani
  * License: GPL-2.0+
@@ -57,150 +57,157 @@ function slv_enqueue_styles() {
         'sample-lesson-viewer',
         plugin_dir_url( __FILE__ ) . 'assets/css/sample-lesson-viewer.css',
         array(),
-        '1.1.0'
+        '1.2.0'
     );
 
     wp_register_script(
         'sample-lesson-viewer',
         plugin_dir_url( __FILE__ ) . 'assets/js/sample-lesson-viewer.js',
         array(),
-        '1.1.0',
+        '1.2.0',
         true
     );
 }
 add_action( 'wp_enqueue_scripts', 'slv_enqueue_styles' );
 
 /**
- * Extract video URL from lesson
+ * Extract video URL from lesson - Enhanced version
  *
  * @param int $lesson_id The lesson ID
  * @return array|false Video data array or false if no video found
  */
 function slv_get_lesson_video( $lesson_id ) {
-    $video_data = array(
-        'url'      => '',
-        'type'     => '',
-        'embed'    => '',
-        'provider' => '',
-    );
+    $video_url = '';
 
-    // Method 1: Check LearnDash video progression settings
+    // Method 1: Check LearnDash video progression settings (main array)
     $lesson_settings = get_post_meta( $lesson_id, '_sfwd-lessons', true );
-
     if ( is_array( $lesson_settings ) ) {
-        // Check for video URL in lesson settings
-        if ( ! empty( $lesson_settings['sfwd-lessons_lesson_video_url'] ) ) {
-            $video_data['url'] = $lesson_settings['sfwd-lessons_lesson_video_url'];
+        $possible_keys = array(
+            'sfwd-lessons_lesson_video_url',
+            'sfwd-lessons_video_url',
+            'lesson_video_url',
+            'video_url',
+        );
+        foreach ( $possible_keys as $key ) {
+            if ( ! empty( $lesson_settings[ $key ] ) ) {
+                $video_url = $lesson_settings[ $key ];
+                break;
+            }
         }
     }
 
-    // Method 2: Check individual meta key (newer LearnDash versions)
-    if ( empty( $video_data['url'] ) ) {
-        $video_url = get_post_meta( $lesson_id, 'lesson_video_url', true );
-        if ( ! empty( $video_url ) ) {
-            $video_data['url'] = $video_url;
+    // Method 2: Check individual meta keys (newer LearnDash versions)
+    if ( empty( $video_url ) ) {
+        $meta_keys = array(
+            'lesson_video_url',
+            '_lesson_video_url',
+            'video_url',
+            '_video_url',
+            'sfwd-lessons_lesson_video_url',
+            '_ld_video_url',
+        );
+        foreach ( $meta_keys as $key ) {
+            $value = get_post_meta( $lesson_id, $key, true );
+            if ( ! empty( $value ) ) {
+                $video_url = $value;
+                break;
+            }
         }
     }
 
-    // Method 3: Extract video from lesson content
-    if ( empty( $video_data['url'] ) ) {
+    // Method 3: Use LearnDash function if available
+    if ( empty( $video_url ) && function_exists( 'learndash_get_setting' ) ) {
+        $video_url = learndash_get_setting( $lesson_id, 'lesson_video_url' );
+    }
+
+    // Method 4: Extract video from lesson content
+    if ( empty( $video_url ) ) {
         $content = get_post_field( 'post_content', $lesson_id );
         $extracted = slv_extract_video_from_content( $content );
-        if ( $extracted ) {
-            $video_data = array_merge( $video_data, $extracted );
+        if ( $extracted && ! empty( $extracted['url'] ) ) {
+            $video_url = $extracted['url'];
         }
     }
 
-    // If we have a URL, determine the provider and generate embed
-    if ( ! empty( $video_data['url'] ) ) {
-        $video_data = slv_process_video_url( $video_data['url'] );
-        return $video_data;
+    // If we have a URL, process and generate embed
+    if ( ! empty( $video_url ) ) {
+        return slv_process_video_url( $video_url );
     }
 
     return false;
 }
 
 /**
- * Extract video URL from content
+ * Extract video URL from content - Enhanced version
  *
  * @param string $content The post content
  * @return array|false Video data or false
  */
 function slv_extract_video_from_content( $content ) {
-    // Check for YouTube URLs
-    $youtube_pattern = '/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/';
-    if ( preg_match( $youtube_pattern, $content, $matches ) ) {
-        return array(
-            'url'      => 'https://www.youtube.com/watch?v=' . $matches[1],
-            'video_id' => $matches[1],
-            'provider' => 'youtube',
-        );
+    if ( empty( $content ) ) {
+        return false;
     }
 
-    // Check for Vimeo URLs
-    $vimeo_pattern = '/(?:https?:\/\/)?(?:www\.)?(?:vimeo\.com\/|player\.vimeo\.com\/video\/)(\d+)/';
-    if ( preg_match( $vimeo_pattern, $content, $matches ) ) {
-        return array(
-            'url'      => 'https://vimeo.com/' . $matches[1],
-            'video_id' => $matches[1],
-            'provider' => 'vimeo',
-        );
+    // Check for iframe embeds first (most common)
+    if ( preg_match( '/<iframe[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $content, $matches ) ) {
+        return array( 'url' => $matches[1], 'provider' => 'iframe' );
     }
 
-    // Check for Wistia URLs
-    $wistia_pattern = '/(?:https?:\/\/)?(?:.*\.)?wistia\.(?:com|net)\/(?:medias|embed)\/([a-zA-Z0-9]+)/';
-    if ( preg_match( $wistia_pattern, $content, $matches ) ) {
-        return array(
-            'url'      => 'https://fast.wistia.net/embed/iframe/' . $matches[1],
-            'video_id' => $matches[1],
-            'provider' => 'wistia',
-        );
+    // Check for video tags
+    if ( preg_match( '/<video[^>]*>.*?<source[^>]+src=["\']([^"\']+)["\'][^>]*>.*?<\/video>/is', $content, $matches ) ) {
+        return array( 'url' => $matches[1], 'provider' => 'self-hosted' );
     }
 
-    // Check for direct video file URLs
-    $video_file_pattern = '/(https?:\/\/[^\s<>"\']+\.(?:mp4|webm|ogg|mov))/i';
-    if ( preg_match( $video_file_pattern, $content, $matches ) ) {
-        return array(
-            'url'      => $matches[1],
-            'video_id' => '',
-            'provider' => 'self-hosted',
-        );
-    }
-
-    // Check for iframe embeds
-    $iframe_pattern = '/<iframe[^>]+src=["\']([^"\']+)["\'][^>]*>/i';
-    if ( preg_match( $iframe_pattern, $content, $matches ) ) {
-        $iframe_src = $matches[1];
-
-        // Determine provider from iframe src
-        if ( strpos( $iframe_src, 'youtube' ) !== false ) {
-            preg_match( '/embed\/([a-zA-Z0-9_-]{11})/', $iframe_src, $id_match );
-            return array(
-                'url'      => $iframe_src,
-                'video_id' => isset( $id_match[1] ) ? $id_match[1] : '',
-                'provider' => 'youtube',
-            );
-        } elseif ( strpos( $iframe_src, 'vimeo' ) !== false ) {
-            preg_match( '/video\/(\d+)/', $iframe_src, $id_match );
-            return array(
-                'url'      => $iframe_src,
-                'video_id' => isset( $id_match[1] ) ? $id_match[1] : '',
-                'provider' => 'vimeo',
-            );
-        } elseif ( strpos( $iframe_src, 'wistia' ) !== false ) {
-            return array(
-                'url'      => $iframe_src,
-                'video_id' => '',
-                'provider' => 'wistia',
-            );
+    // YouTube patterns
+    $youtube_patterns = array(
+        '/(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/',
+        '/(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/',
+        '/(?:https?:\/\/)?youtu\.be\/([a-zA-Z0-9_-]{11})/',
+    );
+    foreach ( $youtube_patterns as $pattern ) {
+        if ( preg_match( $pattern, $content, $matches ) ) {
+            return array( 'url' => 'https://www.youtube.com/watch?v=' . $matches[1], 'video_id' => $matches[1], 'provider' => 'youtube' );
         }
+    }
+
+    // Vimeo patterns
+    if ( preg_match( '/(?:https?:\/\/)?(?:www\.)?(?:vimeo\.com\/|player\.vimeo\.com\/video\/)(\d+)/', $content, $matches ) ) {
+        return array( 'url' => 'https://vimeo.com/' . $matches[1], 'video_id' => $matches[1], 'provider' => 'vimeo' );
+    }
+
+    // Bunny.net / BunnyCDN
+    if ( preg_match( '/(https?:\/\/[^"\'<>\s]+\.b-cdn\.net\/[^"\'<>\s]+)/i', $content, $matches ) ) {
+        return array( 'url' => $matches[1], 'provider' => 'bunny' );
+    }
+    if ( preg_match( '/(https?:\/\/iframe\.mediadelivery\.net\/[^"\'<>\s]+)/i', $content, $matches ) ) {
+        return array( 'url' => $matches[1], 'provider' => 'bunny' );
+    }
+
+    // Cloudflare Stream
+    if ( preg_match( '/(https?:\/\/[^"\'<>\s]*cloudflarestream\.com[^"\'<>\s]*)/i', $content, $matches ) ) {
+        return array( 'url' => $matches[1], 'provider' => 'cloudflare' );
+    }
+
+    // Wistia
+    if ( preg_match( '/(?:https?:\/\/)?(?:.*\.)?wistia\.(?:com|net)\/(?:medias|embed)\/([a-zA-Z0-9]+)/', $content, $matches ) ) {
+        return array( 'url' => 'https://fast.wistia.net/embed/iframe/' . $matches[1], 'video_id' => $matches[1], 'provider' => 'wistia' );
+    }
+
+    // Direct video file URLs (mp4, webm, etc.)
+    if ( preg_match( '/(https?:\/\/[^\s<>"\']+\.(?:mp4|webm|ogg|mov|m4v))/i', $content, $matches ) ) {
+        return array( 'url' => $matches[1], 'provider' => 'self-hosted' );
+    }
+
+    // Generic video URL in shortcode
+    if ( preg_match( '/\[video[^\]]*src=["\']([^"\']+)["\'][^\]]*\]/', $content, $matches ) ) {
+        return array( 'url' => $matches[1], 'provider' => 'self-hosted' );
     }
 
     return false;
 }
 
 /**
- * Process video URL and generate embed code
+ * Process video URL and generate embed code - Enhanced version
  *
  * @param string $url The video URL
  * @return array Video data with embed code
@@ -208,62 +215,75 @@ function slv_extract_video_from_content( $content ) {
 function slv_process_video_url( $url ) {
     $video_data = array(
         'url'      => $url,
-        'type'     => '',
         'embed'    => '',
         'provider' => '',
         'video_id' => '',
     );
 
     // YouTube
-    $youtube_pattern = '/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/';
-    if ( preg_match( $youtube_pattern, $url, $matches ) ) {
+    if ( preg_match( '/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/', $url, $matches ) ) {
         $video_data['provider'] = 'youtube';
         $video_data['video_id'] = $matches[1];
-        $video_data['embed'] = sprintf(
-            '<iframe src="https://www.youtube.com/embed/%s?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>',
-            esc_attr( $matches[1] )
-        );
+        $video_data['embed'] = '<iframe src="https://www.youtube.com/embed/' . esc_attr( $matches[1] ) . '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>';
         return $video_data;
     }
 
     // Vimeo
-    $vimeo_pattern = '/vimeo\.com\/(?:video\/)?(\d+)/';
-    if ( preg_match( $vimeo_pattern, $url, $matches ) ) {
+    if ( preg_match( '/vimeo\.com\/(?:video\/)?(\d+)/', $url, $matches ) ) {
         $video_data['provider'] = 'vimeo';
         $video_data['video_id'] = $matches[1];
-        $video_data['embed'] = sprintf(
-            '<iframe src="https://player.vimeo.com/video/%s?badge=0&autopause=0&player_id=0" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>',
-            esc_attr( $matches[1] )
-        );
+        $video_data['embed'] = '<iframe src="https://player.vimeo.com/video/' . esc_attr( $matches[1] ) . '?badge=0&autopause=0" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>';
         return $video_data;
     }
 
     // Wistia
-    $wistia_pattern = '/wistia\.(?:com|net)\/(?:medias|embed)\/([a-zA-Z0-9]+)/';
-    if ( preg_match( $wistia_pattern, $url, $matches ) ) {
+    if ( preg_match( '/wistia\.(?:com|net)\/(?:medias|embed\/iframe)\/([a-zA-Z0-9]+)/', $url, $matches ) ) {
         $video_data['provider'] = 'wistia';
         $video_data['video_id'] = $matches[1];
-        $video_data['embed'] = sprintf(
-            '<iframe src="https://fast.wistia.net/embed/iframe/%s?videoFoam=true" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>',
-            esc_attr( $matches[1] )
-        );
+        $video_data['embed'] = '<iframe src="https://fast.wistia.net/embed/iframe/' . esc_attr( $matches[1] ) . '?videoFoam=true" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>';
         return $video_data;
     }
 
-    // Self-hosted video (mp4, webm, ogg)
-    if ( preg_match( '/\.(mp4|webm|ogg|mov)$/i', $url ) ) {
+    // Bunny.net Stream (iframe.mediadelivery.net)
+    if ( strpos( $url, 'iframe.mediadelivery.net' ) !== false || strpos( $url, 'b-cdn.net' ) !== false ) {
+        $video_data['provider'] = 'bunny';
+        if ( strpos( $url, 'iframe.mediadelivery.net' ) !== false ) {
+            $video_data['embed'] = '<iframe src="' . esc_url( $url ) . '" loading="lazy" frameborder="0" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+        } else {
+            // Direct bunny CDN video file
+            $video_data['embed'] = '<video controls preload="metadata"><source src="' . esc_url( $url ) . '" type="video/mp4">Your browser does not support the video tag.</video>';
+        }
+        return $video_data;
+    }
+
+    // Cloudflare Stream
+    if ( strpos( $url, 'cloudflarestream.com' ) !== false || strpos( $url, 'videodelivery.net' ) !== false ) {
+        $video_data['provider'] = 'cloudflare';
+        $video_data['embed'] = '<iframe src="' . esc_url( $url ) . '" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>';
+        return $video_data;
+    }
+
+    // Self-hosted video (mp4, webm, ogg, mov)
+    if ( preg_match( '/\.(mp4|webm|ogg|mov|m4v)(\?|$)/i', $url ) ) {
         $video_data['provider'] = 'self-hosted';
-        $video_data['embed'] = sprintf(
-            '<video controls preload="metadata"><source src="%s" type="video/%s">Your browser does not support the video tag.</video>',
-            esc_url( $url ),
-            esc_attr( pathinfo( $url, PATHINFO_EXTENSION ) )
-        );
+        $video_data['embed'] = '<video controls preload="metadata"><source src="' . esc_url( $url ) . '" type="video/mp4">Your browser does not support the video tag.</video>';
         return $video_data;
     }
 
-    // Try WordPress oEmbed as fallback
-    $video_data['provider'] = 'oembed';
-    $video_data['embed'] = wp_oembed_get( $url );
+    // Generic iframe URL (for unknown providers)
+    if ( strpos( $url, 'iframe' ) !== false || strpos( $url, 'embed' ) !== false || strpos( $url, 'player' ) !== false ) {
+        $video_data['provider'] = 'iframe';
+        $video_data['embed'] = '<iframe src="' . esc_url( $url ) . '" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>';
+        return $video_data;
+    }
+
+    // Try WordPress oEmbed as last fallback
+    $oembed = wp_oembed_get( $url );
+    if ( $oembed ) {
+        $video_data['provider'] = 'oembed';
+        $video_data['embed'] = $oembed;
+        return $video_data;
+    }
 
     return $video_data;
 }
@@ -275,14 +295,12 @@ function slv_process_video_url( $url ) {
  * @return array Array of courses with their sample lessons
  */
 function slv_get_sample_lessons( $include_video = false ) {
-    // Check if LearnDash is active
     if ( ! class_exists( 'SFWD_LMS' ) ) {
         return array();
     }
 
     $sample_lessons = array();
 
-    // Query all lessons
     $lessons_args = array(
         'post_type'      => 'sfwd-lessons',
         'posts_per_page' => -1,
@@ -298,11 +316,7 @@ function slv_get_sample_lessons( $include_video = false ) {
             $lessons_query->the_post();
             $lesson_id = get_the_ID();
 
-            // Check if this is a sample lesson
-            $is_sample = slv_is_sample_lesson( $lesson_id );
-
-            if ( $is_sample ) {
-                // Get the course ID for this lesson
+            if ( slv_is_sample_lesson( $lesson_id ) ) {
                 $course_id = slv_get_lesson_course_id( $lesson_id );
 
                 if ( $course_id ) {
@@ -322,7 +336,6 @@ function slv_get_sample_lessons( $include_video = false ) {
                         'thumbnail' => get_the_post_thumbnail_url( $lesson_id, 'medium' ),
                     );
 
-                    // Include video data if requested
                     if ( $include_video ) {
                         $lesson_data['video'] = slv_get_lesson_video( $lesson_id );
                     }
@@ -334,7 +347,6 @@ function slv_get_sample_lessons( $include_video = false ) {
         wp_reset_postdata();
     }
 
-    // Sort courses by title
     uasort( $sample_lessons, function( $a, $b ) {
         return strcasecmp( $a['course_title'], $b['course_title'] );
     });
@@ -344,27 +356,17 @@ function slv_get_sample_lessons( $include_video = false ) {
 
 /**
  * Check if a lesson is a sample lesson
- *
- * @param int $lesson_id The lesson ID
- * @return bool True if sample lesson, false otherwise
  */
 function slv_is_sample_lesson( $lesson_id ) {
-    // Method 1: Check using LearnDash function if available
     if ( function_exists( 'learndash_is_sample' ) ) {
         return learndash_is_sample( $lesson_id );
     }
 
-    // Method 2: Check the lesson meta directly
     $lesson_settings = get_post_meta( $lesson_id, '_sfwd-lessons', true );
-
-    if ( is_array( $lesson_settings ) ) {
-        // Check for sample lesson setting
-        if ( isset( $lesson_settings['sfwd-lessons_sample_lesson'] ) ) {
-            return $lesson_settings['sfwd-lessons_sample_lesson'] === 'on';
-        }
+    if ( is_array( $lesson_settings ) && isset( $lesson_settings['sfwd-lessons_sample_lesson'] ) ) {
+        return $lesson_settings['sfwd-lessons_sample_lesson'] === 'on';
     }
 
-    // Method 3: Check individual meta key (newer LearnDash versions)
     $sample_meta = get_post_meta( $lesson_id, 'sample_lesson', true );
     if ( $sample_meta === 'on' || $sample_meta === '1' || $sample_meta === true ) {
         return true;
@@ -375,24 +377,17 @@ function slv_is_sample_lesson( $lesson_id ) {
 
 /**
  * Get the course ID for a lesson
- *
- * @param int $lesson_id The lesson ID
- * @return int|false The course ID or false if not found
  */
 function slv_get_lesson_course_id( $lesson_id ) {
-    // Method 1: Use LearnDash function if available
     if ( function_exists( 'learndash_get_course_id' ) ) {
         return learndash_get_course_id( $lesson_id );
     }
 
-    // Method 2: Check lesson meta
     $lesson_settings = get_post_meta( $lesson_id, '_sfwd-lessons', true );
-
     if ( is_array( $lesson_settings ) && isset( $lesson_settings['sfwd-lessons_course'] ) ) {
         return intval( $lesson_settings['sfwd-lessons_course'] );
     }
 
-    // Method 3: Check course meta key directly
     $course_id = get_post_meta( $lesson_id, 'course_id', true );
     if ( $course_id ) {
         return intval( $course_id );
@@ -403,20 +398,15 @@ function slv_get_lesson_course_id( $lesson_id ) {
 
 /**
  * Display sample lessons shortcode callback
- *
- * @param array $atts Shortcode attributes
- * @return string HTML output
  */
 function slv_display_sample_lessons( $atts ) {
-    // Check if LearnDash is active
     if ( ! slv_check_learndash_active() ) {
         return '<p class="slv-error">' . esc_html__( 'LearnDash LMS is required to display sample lessons.', 'sample-lesson-viewer' ) . '</p>';
     }
 
-    // Parse shortcode attributes
     $atts = shortcode_atts( array(
         'columns'        => 2,
-        'show_excerpt'   => 'yes',
+        'show_excerpt'   => 'no',
         'show_thumbnail' => 'yes',
         'show_video'     => 'yes',
         'show_course'    => 'yes',
@@ -425,15 +415,17 @@ function slv_display_sample_lessons( $atts ) {
         'order'          => 'ASC',
     ), $atts, 'learndash_sample_lessons' );
 
-    // Enqueue styles and scripts
+    // Enqueue styles
     wp_enqueue_style( 'sample-lesson-viewer' );
     wp_enqueue_script( 'sample-lesson-viewer' );
 
-    // Get sample lessons with video data
+    $columns = intval( $atts['columns'] );
+    if ( $columns < 1 ) $columns = 1;
+    if ( $columns > 4 ) $columns = 4;
+
     $include_video = ( $atts['show_video'] === 'yes' );
     $sample_lessons = slv_get_sample_lessons( $include_video );
 
-    // Filter by course if specified
     if ( ! empty( $atts['course_id'] ) ) {
         $course_ids = array_map( 'intval', explode( ',', $atts['course_id'] ) );
         $sample_lessons = array_intersect_key( $sample_lessons, array_flip( $course_ids ) );
@@ -443,10 +435,165 @@ function slv_display_sample_lessons( $atts ) {
         return '<p class="slv-no-lessons">' . esc_html__( 'No sample lessons found.', 'sample-lesson-viewer' ) . '</p>';
     }
 
-    // Build output
+    // Detect RTL
+    $is_rtl = is_rtl();
+    $dir_attr = $is_rtl ? 'dir="rtl"' : '';
+
     ob_start();
     ?>
-    <div class="slv-sample-lessons-wrapper <?php echo $include_video ? 'slv-with-video' : ''; ?>">
+    <style>
+    .slv-sample-lessons-wrapper {
+        margin: 20px 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .slv-course-section {
+        margin-bottom: 40px;
+    }
+    .slv-course-title {
+        font-size: 1.4em;
+        font-weight: 600;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 3px solid #0073aa;
+        color: #23282d;
+    }
+    .slv-course-title a {
+        color: inherit;
+        text-decoration: none;
+    }
+    .slv-course-title a:hover {
+        color: #0073aa;
+    }
+    .slv-lessons-grid {
+        display: grid !important;
+        gap: 20px !important;
+        grid-template-columns: repeat(<?php echo $columns; ?>, 1fr) !important;
+    }
+    @media (max-width: 768px) {
+        .slv-lessons-grid {
+            grid-template-columns: 1fr !important;
+        }
+    }
+    @media (min-width: 769px) and (max-width: 1024px) {
+        .slv-lessons-grid {
+            grid-template-columns: repeat(<?php echo min( $columns, 2 ); ?>, 1fr) !important;
+        }
+    }
+    .slv-lesson-card {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        transition: box-shadow 0.3s ease, transform 0.3s ease;
+        display: flex;
+        flex-direction: column;
+    }
+    .slv-lesson-card:hover {
+        box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    .slv-video-container {
+        position: relative;
+        width: 100%;
+        background: #000;
+    }
+    .slv-video-wrapper {
+        position: relative;
+        padding-bottom: 56.25%;
+        height: 0;
+        overflow: hidden;
+    }
+    .slv-video-wrapper iframe,
+    .slv-video-wrapper video {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
+    }
+    .slv-lesson-thumbnail {
+        overflow: hidden;
+        background: #f5f5f5;
+    }
+    .slv-lesson-thumbnail img {
+        width: 100%;
+        height: 180px;
+        object-fit: cover;
+        display: block;
+    }
+    .slv-lesson-content {
+        padding: 16px;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    .slv-lesson-title {
+        font-size: 1em;
+        font-weight: 600;
+        margin: 0 0 12px 0;
+        line-height: 1.4;
+    }
+    .slv-lesson-title a {
+        color: #333;
+        text-decoration: none;
+    }
+    .slv-lesson-title a:hover {
+        color: #0073aa;
+    }
+    .slv-lesson-excerpt {
+        font-size: 0.9em;
+        color: #666;
+        margin-bottom: 12px;
+        line-height: 1.5;
+        flex-grow: 1;
+    }
+    .slv-lesson-link {
+        display: inline-block;
+        padding: 10px 20px;
+        background: #0073aa;
+        color: #fff !important;
+        text-decoration: none !important;
+        border-radius: 4px;
+        font-size: 0.9em;
+        font-weight: 500;
+        text-align: center;
+        transition: background 0.3s ease;
+        align-self: flex-start;
+    }
+    .slv-lesson-link:hover {
+        background: #005177;
+        color: #fff !important;
+    }
+    .slv-no-lessons, .slv-error {
+        padding: 20px;
+        background: #f7f7f7;
+        border-left: 4px solid #0073aa;
+        margin: 20px 0;
+    }
+    .slv-error {
+        border-left-color: #dc3232;
+    }
+    /* RTL Support */
+    .slv-rtl {
+        direction: rtl;
+        text-align: right;
+    }
+    .slv-rtl .slv-lesson-link {
+        align-self: flex-end;
+    }
+    .slv-rtl .slv-no-lessons,
+    .slv-rtl .slv-error {
+        border-left: none;
+        border-right: 4px solid #0073aa;
+    }
+    .slv-rtl .slv-error {
+        border-right-color: #dc3232;
+    }
+    </style>
+
+    <div class="slv-sample-lessons-wrapper <?php echo $is_rtl ? 'slv-rtl' : ''; ?>" <?php echo $dir_attr; ?>>
         <?php foreach ( $sample_lessons as $course_id => $course_data ) : ?>
             <?php if ( $atts['show_course'] === 'yes' ) : ?>
                 <div class="slv-course-section">
@@ -457,11 +604,14 @@ function slv_display_sample_lessons( $atts ) {
                     </h2>
             <?php endif; ?>
 
-            <div class="slv-lessons-grid slv-columns-<?php echo intval( $atts['columns'] ); ?>">
+            <div class="slv-lessons-grid">
                 <?php foreach ( $course_data['lessons'] as $lesson ) : ?>
-                    <div class="slv-lesson-card <?php echo ( $include_video && ! empty( $lesson['video'] ) ) ? 'slv-has-video' : ''; ?>">
+                    <div class="slv-lesson-card">
+                        <?php
+                        $has_video = $include_video && ! empty( $lesson['video'] ) && ! empty( $lesson['video']['embed'] );
+                        ?>
 
-                        <?php if ( $include_video && ! empty( $lesson['video'] ) && ! empty( $lesson['video']['embed'] ) ) : ?>
+                        <?php if ( $has_video ) : ?>
                             <div class="slv-video-container">
                                 <div class="slv-video-wrapper">
                                     <?php echo $lesson['video']['embed']; ?>
@@ -482,12 +632,6 @@ function slv_display_sample_lessons( $atts ) {
                                 </a>
                             </h3>
 
-                            <?php if ( $atts['show_course'] !== 'yes' ) : ?>
-                                <span class="slv-lesson-course">
-                                    <?php echo esc_html( $course_data['course_title'] ); ?>
-                                </span>
-                            <?php endif; ?>
-
                             <?php if ( $atts['show_excerpt'] === 'yes' && ! empty( $lesson['excerpt'] ) ) : ?>
                                 <div class="slv-lesson-excerpt">
                                     <?php echo wp_kses_post( $lesson['excerpt'] ); ?>
@@ -495,7 +639,7 @@ function slv_display_sample_lessons( $atts ) {
                             <?php endif; ?>
 
                             <a href="<?php echo esc_url( $lesson['url'] ); ?>" class="slv-lesson-link">
-                                <?php esc_html_e( 'View Full Lesson', 'sample-lesson-viewer' ); ?>
+                                <?php echo $is_rtl ? 'مشاهدة الدرس' : 'View Lesson'; ?>
                             </a>
                         </div>
                     </div>
@@ -511,49 +655,3 @@ function slv_display_sample_lessons( $atts ) {
 
     return ob_get_clean();
 }
-
-/**
- * Add inline styles as fallback if CSS file doesn't load
- */
-function slv_add_inline_styles() {
-    $inline_css = '
-        .slv-sample-lessons-wrapper { margin: 20px 0; }
-        .slv-course-section { margin-bottom: 40px; }
-        .slv-course-title { font-size: 1.5em; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #0073aa; }
-        .slv-course-title a { color: inherit; text-decoration: none; }
-        .slv-course-title a:hover { color: #0073aa; }
-        .slv-lessons-grid { display: grid; gap: 24px; }
-        .slv-columns-1 { grid-template-columns: 1fr; }
-        .slv-columns-2 { grid-template-columns: repeat(2, 1fr); }
-        .slv-columns-3 { grid-template-columns: repeat(3, 1fr); }
-        .slv-columns-4 { grid-template-columns: repeat(4, 1fr); }
-        .slv-lesson-card { background: #fff; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; transition: box-shadow 0.3s ease; }
-        .slv-lesson-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-        .slv-video-container { position: relative; width: 100%; background: #000; }
-        .slv-video-wrapper { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; }
-        .slv-video-wrapper iframe, .slv-video-wrapper video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        .slv-lesson-thumbnail img { width: 100%; height: 180px; object-fit: cover; display: block; }
-        .slv-lesson-content { padding: 20px; }
-        .slv-lesson-title { font-size: 1.1em; margin: 0 0 10px 0; }
-        .slv-lesson-title a { color: #333; text-decoration: none; }
-        .slv-lesson-title a:hover { color: #0073aa; }
-        .slv-lesson-course { display: block; font-size: 0.85em; color: #666; margin-bottom: 10px; }
-        .slv-lesson-excerpt { font-size: 0.9em; color: #555; margin-bottom: 15px; line-height: 1.5; }
-        .slv-lesson-link { display: inline-block; padding: 8px 16px; background: #0073aa; color: #fff; text-decoration: none; border-radius: 4px; font-size: 0.9em; transition: background 0.3s ease; }
-        .slv-lesson-link:hover { background: #005177; color: #fff; }
-        .slv-no-lessons, .slv-error { padding: 20px; background: #f7f7f7; border-left: 4px solid #0073aa; margin: 20px 0; }
-        .slv-error { border-left-color: #dc3232; }
-        @media (max-width: 768px) {
-            .slv-columns-2, .slv-columns-3, .slv-columns-4 { grid-template-columns: 1fr; }
-        }
-        @media (min-width: 769px) and (max-width: 1024px) {
-            .slv-columns-3, .slv-columns-4 { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (min-width: 1400px) {
-            .slv-with-video .slv-columns-2 { grid-template-columns: repeat(2, 1fr); }
-            .slv-with-video .slv-columns-3 { grid-template-columns: repeat(3, 1fr); }
-        }
-    ';
-    wp_add_inline_style( 'sample-lesson-viewer', $inline_css );
-}
-add_action( 'wp_enqueue_scripts', 'slv_add_inline_styles', 20 );
